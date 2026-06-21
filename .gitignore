@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+favorites.json
+search_history.json

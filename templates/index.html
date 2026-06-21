@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FlightTrack — Live Flight Search</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    /* ---- Palette: instrument-panel navy, warm brass accent, signal colors ---- */
+    --ink-900:#070b12;
+    --ink-800:#0c1320;
+    --panel:#10192a;
+    --panel-2:#16223a;
+    --panel-3:#1c2b48;
+    --hair:#243755;
+    --hair-soft:rgba(140,170,220,.08);
+
+    --brass:#e8b860;
+    --brass-dim:rgba(232,184,96,.14);
+    --sky:#5fa8e8;
+    --sky-dim:rgba(95,168,232,.14);
+    --mint:#3ecf8e;
+    --mint-dim:rgba(62,207,142,.14);
+    --coral:#ef6a5f;
+    --coral-dim:rgba(239,106,95,.14);
+    --violet:#9b87e8;
+    --violet-dim:rgba(155,135,232,.14);
+
+    --ivory:#f3f1ea;
+    --fog:#9fb0cc;
+    --fog-dim:#5d6f8f;
+
+    --r-lg:20px; --r-md:13px; --r-sm:9px;
+    --display: 'Space Grotesk', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    --sans: 'Inter', system-ui, sans-serif;
+    --ease: cubic-bezier(.16,1,.3,1);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+
+  body{
+    font-family:var(--sans);
+    color:var(--ivory);
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(95,168,232,.08), transparent 60%),
+      radial-gradient(700px 460px at 88% 0%, rgba(232,184,96,.06), transparent 55%),
+      var(--ink-900);
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  a{color:inherit;}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;}
+  :focus-visible{outline:2px solid var(--sky);outline-offset:2px;border-radius:4px;}
+
+  /* ============ HEADER ============ */
+  header{
+    position:sticky;top:0;z-index:50;
+    padding:16px 28px;
+    background:rgba(7,11,18,.82);
+    backdrop-filter:blur(14px) saturate(140%);
+    border-bottom:1px solid var(--hair-soft);
+    display:flex;justify-content:space-between;align-items:center;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;}
+  .brand-mark{
+    width:36px;height:36px;border-radius:10px;
+    background:linear-gradient(150deg,var(--sky),#2c5fa8);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    box-shadow:0 6px 16px rgba(95,168,232,.3), inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .brand-mark svg{width:18px;height:18px;color:#fff;transform:rotate(45deg);}
+  .brand-name{font-family:var(--display);font-size:1.08rem;font-weight:700;letter-spacing:-.01em;}
+  .brand-name span{color:var(--brass);}
+  .brand-tag{font-size:11px;color:var(--fog-dim);margin-top:-1px;letter-spacing:.03em;}
+
+  .header-status{display:flex;align-items:center;gap:18px;}
+  .live-pill{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mint);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 0 rgba(62,207,142,.6);animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(62,207,142,.5);}70%{box-shadow:0 0 0 6px rgba(62,207,142,0);}100%{box-shadow:0 0 0 0 rgba(62,207,142,0);}}
+  .clock{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;color:var(--fog);letter-spacing:.02em;}
+  @media (max-width:560px){.clock{display:none;}}
+
+  .logout-btn{
+    display:flex;align-items:center;gap:6px;padding:7px 13px;
+    border:1px solid var(--hair);border-radius:var(--r-sm);
+    background:transparent;color:var(--fog);font-family:var(--sans);font-size:12px;font-weight:600;
+    cursor:pointer;transition:border-color .15s var(--ease),color .15s var(--ease);
+  }
+  .logout-btn:hover{border-color:var(--coral);color:var(--coral);}
+  .logout-btn svg{width:13px;height:13px;}
+
+  /* ============ LAYOUT ============ */
+  .layout{display:grid;grid-template-columns:300px 1fr;gap:20px;padding:24px;max-width:1300px;margin:auto;align-items:start;}
+
+  .card{
+    background:linear-gradient(160deg,var(--panel),var(--panel) 60%,var(--panel-2));
+    border:1px solid var(--hair);
+    border-radius:var(--r-md);
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 12px 28px -16px rgba(0,0,0,.5);
+  }
+  .card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
+  .card-title{color:var(--fog);font-weight:700;font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;display:flex;align-items:center;gap:7px;}
+  .card-title svg{width:13px;height:13px;color:var(--sky);}
+  .card-count{font-size:11px;color:var(--fog-dim);font-family:var(--mono);}
+
+  .card.error{border-color:var(--coral);}
+  .error-body{display:flex;align-items:flex-start;gap:10px;}
+  .error-body svg{width:18px;height:18px;flex-shrink:0;color:var(--coral);margin-top:2px;}
+  .error-body p{font-size:13.5px;color:var(--ivory);}
+  .card-title.error-title{color:var(--coral);}
+  .card-title.error-title svg{color:var(--coral);}
+
+  /* ============ SEARCH ============ */
+  .field{display:flex;flex-direction:column;gap:6px;position:relative;}
+  .field label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--fog-dim);}
+  .field-stack{display:flex;flex-direction:column;gap:10px;position:relative;}
+
+  .field input{
+    width:100%;padding:12px 40px 12px 13px;
+    background:var(--ink-800);
+    border:1px solid var(--hair);
+    color:var(--ivory);
+    border-radius:var(--r-sm);
+    font-family:var(--mono);font-weight:600;font-size:1.05rem;
+    letter-spacing:.14em;text-transform:uppercase;
+    transition:border-color .15s var(--ease), box-shadow .15s var(--ease);
+  }
+  .field input::placeholder{color:var(--fog-dim);letter-spacing:.08em;}
+  .field input:focus{border-color:var(--sky);box-shadow:0 0 0 3px var(--sky-dim);}
+  .field input:invalid:not(:placeholder-shown){border-color:var(--coral);}
+
+  .swap-btn{
+    position:absolute;right:8px;top:37px;width:30px;height:30px;border-radius:50%;
+    background:var(--panel-3);border:1px solid var(--hair);color:var(--fog);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:all .15s var(--ease);z-index:2;
+  }
+  .swap-btn:hover{border-color:var(--sky);color:var(--sky);transform:translateY(-1px);}
+  .swap-btn svg{width:14px;height:14px;transition:transform .3s var(--ease);}
+  .swap-btn:active svg{transform:rotate(180deg);}
+
+  .field-hint{font-size:11.5px;color:var(--fog-dim);margin-top:2px;}
+  .field-hint.error{color:var(--coral);}
+
+  .btn{
+    width:100%;padding:12px;border:none;border-radius:var(--r-sm);cursor:pointer;
+    font-family:var(--sans);font-weight:700;font-size:.88rem;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:filter .15s var(--ease), transform .1s var(--ease);
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn svg{width:16px;height:16px;}
+
+  .btn-primary{
+    margin-top:14px;
+    background:linear-gradient(135deg,var(--sky),#2c5fa8);
+    color:#fff;
+    box-shadow:0 8px 20px rgba(95,168,232,.28), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .btn-primary:hover{filter:brightness(1.08);}
+
+  .btn-secondary{background:transparent;border:1px solid var(--hair);color:var(--fog);margin-top:8px;}
+  .btn-secondary:hover{border-color:var(--coral);color:var(--coral);}
+
+  /* ============ WEATHER ============ */
+  .weather-top{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}
+  .weather-temp{font-family:var(--display);font-size:2.1rem;font-weight:700;}
+  .weather-desc{font-size:13px;color:var(--fog);text-transform:capitalize;}
+  .weather-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .weather-stat{text-align:center;padding:9px 4px;background:var(--ink-800);border:1px solid var(--hair-soft);border-radius:var(--r-sm);}
+  .weather-stat .v{font-family:var(--mono);font-weight:600;font-size:13px;}
+  .weather-stat .l{font-size:9px;color:var(--fog-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+  .weather-extra{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:11.5px;color:var(--fog);}
+  .weather-extra span{background:rgba(255,255,255,.025);border:1px solid var(--hair-soft);border-radius:var(--r-sm);padding:7px 8px;}
+
+  /* ============ FAVORITES / HISTORY ============ */
+  .route-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .route-link{
+    flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px 12px;border-radius:var(--r-sm);
+    border:1px solid var(--hair);background:var(--ink-800);
+    text-decoration:none;color:var(--ivory);
+    transition:border-color .15s var(--ease), transform .15s var(--ease), background .15s var(--ease);
+  }
+  .route-link:hover{border-color:var(--sky);background:var(--panel-3);transform:translateX(2px);}
+  .route-codes{font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.04em;display:flex;align-items:center;gap:6px;}
+  .route-codes svg{width:11px;height:11px;color:var(--fog-dim);}
+  .route-codes-stack{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .route-flightno{font-family:var(--mono);font-weight:700;font-size:12px;color:var(--brass);letter-spacing:.03em;}
+  .favorite-route-link{align-items:flex-start;padding:9px 12px;}
+
+  .icon-btn{
+    width:30px;height:30px;flex-shrink:0;border-radius:8px;
+    background:transparent;border:1px solid transparent;color:var(--fog-dim);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s var(--ease);
+  }
+  .icon-btn:hover{color:var(--coral);border-color:var(--hair);background:var(--ink-800);}
+  .icon-btn svg{width:14px;height:14px;}
+
+  .empty-line{font-size:12.5px;color:var(--fog-dim);padding:6px 2px;}
+
+  /* ============ ROUTE HERO — split-flap signature ============ */
+  .route-hero{display:flex;align-items:center;justify-content:center;gap:20px;padding:6px 6px 20px;}
+  .route-node{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:96px;}
+
+  .flap-code{display:flex;gap:3px;}
+  .flap{
+    position:relative;width:34px;height:46px;border-radius:5px;
+    background:linear-gradient(180deg,#1a2742,#101a2e);
+    border:1px solid var(--hair);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 4px 10px rgba(0,0,0,.35);
+    overflow:hidden;
+  }
+  .flap::after{
+    content:'';position:absolute;left:0;right:0;top:50%;height:1px;
+    background:rgba(0,0,0,.55);transform:translateY(-.5px);z-index:2;
+  }
+  .flap span{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;font-size:1.5rem;color:var(--ivory);
+    text-shadow:0 1px 1px rgba(0,0,0,.4);
+  }
+  .route-city{font-size:11px;color:var(--fog);text-align:center;max-width:140px;letter-spacing:.02em;}
+
+  .route-path{flex:1;max-width:230px;height:1px;background-image:repeating-linear-gradient(90deg,var(--hair) 0 8px,transparent 8px 16px);position:relative;}
+  .route-path .plane-wrap{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:30px;height:30px;border-radius:50%;background:var(--ink-900);border:1px solid var(--hair);
+    display:flex;align-items:center;justify-content:center;animation:float 3s ease-in-out infinite;
+  }
+  .route-path .plane-wrap svg{width:14px;height:14px;color:var(--brass);transform:rotate(90deg);}
+  @keyframes float{0%,100%{transform:translate(-50%,-52%);}50%{transform:translate(-50%,-48%);}}
+
+  .route-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:1px solid var(--hair-soft);padding-top:14px;}
+  .summary-tile{background:var(--ink-800);border:1px solid var(--hair);border-radius:var(--r-sm);padding:11px 12px;min-width:0;}
+  .summary-tile .label{display:block;font-size:9.5px;color:var(--fog-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+  .summary-tile .value{display:block;font-family:var(--mono);font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  @media (prefers-reduced-motion:reduce){.route-path .plane-wrap,.live-dot{animation:none !important;}}
+
+  /* ============ PRICES ============ */
+  .refresh-btn{
+    width:30px;height:30px;border-radius:8px;border:1px solid var(--hair);
+    background:var(--ink-800);color:var(--fog);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .15s var(--ease);
+  }
+  .refresh-btn:hover{border-color:var(--sky);color:var(--sky);}
+  .refresh-btn svg{width:14px;height:14px;transition:transform .4s var(--ease);}
+  .refresh-btn.spinning svg{animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .price-updated{font-size:11px;color:var(--fog-dim);margin:-8px 0 12px;}
+
+  .price-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;}
+  .price-item{position:relative;background:var(--ink-800);padding:14px;border-radius:var(--r-md);border:1px solid var(--hair);transition:border-color .15s var(--ease), transform .15s var(--ease);}
+  .price-item:hover{transform:translateY(-2px);border-color:var(--hair);}
+  .price-item.cheapest{border-color:var(--brass);background:linear-gradient(160deg,var(--brass-dim),var(--ink-800) 65%);}
+  .price-badge{display:inline-flex;align-items:center;gap:4px;background:var(--brass);color:#1a1306;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-bottom:8px;}
+  .price-airline-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .airline-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;background:var(--panel-3);border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--sky);font-family:var(--mono);}
+  .price-airline{font-weight:700;font-size:13.5px;}
+  .price-flightno{font-size:11px;color:var(--fog-dim);font-family:var(--mono);margin:-6px 0 10px 34px;}
+  .price-value{font-family:var(--mono);font-weight:700;font-size:1.18rem;color:var(--ivory);}
+  .price-value .cur{font-size:10px;color:var(--fog-dim);font-weight:600;margin-right:3px;}
+  .price-pkr{font-size:11.5px;color:var(--fog);margin-top:2px;}
+  .price-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .price-chip{font-size:10.5px;color:var(--fog);border:1px solid var(--hair-soft);border-radius:999px;padding:3px 8px;background:rgba(255,255,255,.025);}
+
+  .skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;}
+  .skeleton-card{height:104px;border-radius:var(--r-md);background:linear-gradient(110deg,var(--ink-800) 8%,var(--panel-3) 24%,var(--ink-800) 40%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;}
+  @keyframes shimmer{to{background-position-x:-200%;}}
+  @media (prefers-reduced-motion:reduce){.skeleton-card{animation:none;}}
+
+  .price-message{font-size:13px;color:var(--fog);padding:8px 2px;}
+
+  /* ============ FLIGHT BOARD ============ */
+  .board-tools{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
+  .board-filter{
+    min-width:150px;padding:10px 12px;background:var(--ink-800);border:1px solid var(--hair);
+    color:var(--ivory);border-radius:var(--r-sm);font-family:var(--sans);font-weight:700;font-size:13px;
+  }
+  .board-search{
+    flex:1;min-width:0;padding:10px 12px;background:var(--ink-800);border:1px solid var(--hair);
+    color:var(--ivory);border-radius:var(--r-sm);font-family:var(--sans);font-weight:500;font-size:13px;
+  }
+  .board-search::placeholder{color:var(--fog-dim);}
+  .board-filter:focus,.board-search:focus{border-color:var(--sky);}
+  .board-no-results{display:none;color:var(--fog);font-size:13px;padding:16px;border:1px dashed var(--hair);border-radius:var(--r-sm);text-align:center;}
+
+  .board-row{
+    display:grid;grid-template-columns:1fr 28px 1fr 1.3fr 44px;
+    grid-template-areas:"origin arrow dest info save";
+    align-items:center;gap:14px;padding:16px;
+    border:1px solid var(--hair);border-radius:var(--r-md);background:var(--panel-2);
+    margin-bottom:10px;transition:border-color .15s var(--ease), background .15s var(--ease);
+  }
+  .board-row:hover{border-color:var(--sky);background:var(--panel-3);}
+  .board-origin{grid-area:origin;}
+  .board-arrow{grid-area:arrow;display:flex;justify-content:center;color:var(--fog-dim);}
+  .board-arrow svg{width:16px;height:16px;}
+  .board-dest{grid-area:dest;}
+  .board-code{font-family:var(--mono);font-weight:700;font-size:1.18rem;letter-spacing:.02em;}
+  .board-airport{font-size:11px;color:var(--fog-dim);margin-top:2px;}
+  .board-time{display:inline-flex;margin-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--fog);background:rgba(255,255,255,.03);border:1px solid var(--hair-soft);border-radius:999px;padding:3px 9px;}
+
+  .board-info{grid-area:info;display:flex;flex-direction:column;gap:6px;}
+  .board-flightno{font-family:var(--mono);font-weight:600;font-size:13px;}
+  .board-airline{font-size:11.5px;color:var(--fog);}
+  .board-delay{font-size:11px;color:var(--brass);font-family:var(--mono);}
+
+  .status-pill{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;border-radius:999px;width:fit-content;}
+  .status-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .status-scheduled{background:var(--sky-dim);color:var(--sky);}
+  .status-active{background:var(--mint-dim);color:var(--mint);}
+  .status-landed{background:var(--violet-dim);color:var(--violet);}
+  .status-cancelled{background:var(--coral-dim);color:var(--coral);}
+  .status-diverted{background:var(--brass-dim);color:var(--brass);}
+  .status-incident{background:var(--coral-dim);color:var(--coral);}
+  .status-unknown{background:rgba(255,255,255,.05);color:var(--fog);}
+
+  .save-btn{
+    grid-area:save;width:42px;height:42px;border-radius:50%;
+    border:1px solid var(--hair);background:var(--ink-800);color:var(--fog-dim);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .15s var(--ease);justify-self:end;
+  }
+  .save-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;transition:fill .15s var(--ease);}
+  .save-btn:hover{border-color:var(--brass);color:var(--brass);}
+  .save-btn.active{border-color:var(--brass);color:var(--brass);background:var(--brass-dim);}
+  .save-btn.active svg{fill:currentColor;}
+  .save-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .save-btn:disabled:hover{border-color:var(--hair);color:var(--fog-dim);}
+
+  /* ============ EMPTY STATES ============ */
+  .empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:48px 20px;color:var(--fog);}
+  .empty-state svg{width:38px;height:38px;color:var(--fog-dim);}
+  .empty-state p{font-size:13.5px;max-width:320px;}
+  .empty-state strong{color:var(--ivory);display:block;margin-bottom:4px;font-size:15px;font-family:var(--display);}
+
+  /* ============ TOASTS ============ */
+  .toast-container{position:fixed;bottom:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:8px;max-width:280px;}
+  .toast{
+    background:var(--panel-3);border:1px solid var(--hair);color:var(--ivory);
+    padding:11px 14px;border-radius:var(--r-sm);font-size:13px;
+    box-shadow:0 14px 32px rgba(0,0,0,.45);
+    opacity:0;transform:translateY(8px);transition:opacity .2s var(--ease), transform .2s var(--ease);
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast-success{border-color:var(--mint);}
+  .toast-error{border-color:var(--coral);}
+
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;padding:14px;}
+    header{padding:12px 14px;}
+    .route-summary{grid-template-columns:1fr;}
+    .board-tools{flex-direction:column;align-items:stretch;}
+    .board-row{
+      grid-template-columns:1fr 28px 1fr;
+      grid-template-areas:"origin arrow dest" "info info info" "save save save";
+      row-gap:12px;
+    }
+    .save-btn{justify-self:flex-end;}
+    .route-hero{gap:10px;}
+    .route-path{max-width:70px;}
+    .flap{width:28px;height:38px;}
+    .flap span{font-size:1.25rem;}
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 16.5v-1.6L13.5 9V4a1.5 1.5 0 0 0-3 0v5L2 14.9v1.6l8.5-2.6V18l-2.4 1.8v1.4l3.9-1 3.9 1v-1.4L13.5 18v-4.1l8.5 2.6Z"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">Flight<span>Track</span></div>
+      <div class="brand-tag">Live flight search</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <span class="clock" id="clock" aria-hidden="true"></span>
+    <span class="live-pill"><span class="live-dot"></span>Live</span>
+    <form method="POST" action="/logout" style="margin:0">
+      <button class="logout-btn" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Sign out
+      </button>
+    </form>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside>
+
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Search
+      </div>
+      <form method="GET" action="/" id="search-form" novalidate>
+        <div class="field-stack">
+          <div class="field">
+            <label for="source-input">From</label>
+            <input type="text" id="source-input" name="source" placeholder="LHR" value="{{ source }}"
+                   maxlength="3" pattern="[A-Za-z]{3}" autocomplete="off" required>
+          </div>
+          <button class="swap-btn" type="button" id="swap-btn" aria-label="Swap origin and destination">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10V4m0 0L4 7m3-3 3 3M17 14v6m0 0 3-3m-3 3-3-3"/></svg>
+          </button>
+          <div class="field">
+            <label for="destination-input">To</label>
+            <input type="text" id="destination-input" name="destination" placeholder="DXB" value="{{ destination }}"
+                   maxlength="3" pattern="[A-Za-z]{3}" autocomplete="off" required>
+          </div>
+        </div>
+        <div class="field-hint" id="form-hint">Use 3-letter IATA airport codes</div>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 16.5v-1.6L13.5 9V4a1.5 1.5 0 0 0-3 0v5L2 14.9v1.6l8.5-2.6V18l-2.4 1.8v1.4l3.9-1 3.9 1v-1.4L13.5 18v-4.1l8.5 2.6Z"/></svg>
+          Search flights
+        </button>
+      </form>
+    </div>
+
+    {% if weather %}
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10Z"/></svg>
+        Weather &middot; {{ weather.city }}
+      </div>
+      <div class="weather-top">
+        <div class="weather-temp">{{ weather.temp }}&deg;</div>
+        <div class="weather-desc">{{ weather.desc }}</div>
+      </div>
+      <div class="weather-stats">
+        <div class="weather-stat"><div class="v">{{ weather.feels_like }}&deg;</div><div class="l">Feels like</div></div>
+        <div class="weather-stat"><div class="v">{{ weather.humidity }}%</div><div class="l">Humidity</div></div>
+        <div class="weather-stat"><div class="v">{{ weather.wind_kph }}</div><div class="l">Wind km/h</div></div>
+      </div>
+      <div class="weather-extra">
+        <span>Visibility {{ weather.visibility_km }} km</span>
+        <span>Clouds {{ weather.cloudiness }}%</span>
+        <span>Sunrise {{ weather.sunrise }}</span>
+        <span>Sunset {{ weather.sunset }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card" id="favorites-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          Favorites
+        </div>
+        <span class="card-count" id="favorites-count">{% if favorites %}{{ favorites|length }}{% endif %}</span>
+      </div>
+      <div id="favorites-list">
+        {% for f in favorites %}
+          <div class="route-row" data-flight-no="{{ f.flight_no }}">
+            <a class="route-link favorite-route-link" href="/?source={{ f.source }}&destination={{ f.destination }}">
+              <span class="route-codes-stack">
+                <span class="route-flightno">{{ f.flight_no }}{% if f.airline %} &middot; {{ f.airline }}{% endif %}</span>
+                <span class="route-codes">
+                  {{ f.source }}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  {{ f.destination }}
+                </span>
+              </span>
+            </a>
+            <button class="icon-btn" title="Remove favorite" aria-label="Remove flight {{ f.flight_no }} from favorites"
+              onclick="removeFavorite('{{ f.flight_no }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        {% else %}
+          <div class="empty-line" id="favorites-empty">Star a flight to save it here.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          History
+        </div>
+      </div>
+      {% for h in history[:5] %}
+        <div class="route-row">
+          <a class="route-link" href="/?source={{ h.source }}&destination={{ h.destination }}">
+            <span class="route-codes">
+              {{ h.source }}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              {{ h.destination }}
+            </span>
+          </a>
+        </div>
+      {% else %}
+        <div class="empty-line">Your recent searches will show up here.</div>
+      {% endfor %}
+      {% if history %}
+        <button class="btn btn-secondary" onclick="clearHistory()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>
+          Clear history
+        </button>
+      {% endif %}
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+
+    {% if error %}
+    <div class="card error">
+      <div class="card-title error-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 2.5 17a1.5 1.5 0 0 0 1.3 2.2h16.4a1.5 1.5 0 0 0 1.3-2.2L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/></svg>
+        Error
+      </div>
+      <div class="error-body">
+        <p>{{ error }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if destination %}
+
+    <!-- ROUTE HERO with split-flap codes -->
+    <div class="card">
+      <div class="route-hero">
+        <div class="route-node">
+          <div class="flap-code" id="flap-source" aria-label="{{ source|upper }}"></div>
+          <div class="route-city">Origin</div>
+        </div>
+        <div class="route-path">
+          <div class="plane-wrap">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 16.5v-1.6L13.5 9V4a1.5 1.5 0 0 0-3 0v5L2 14.9v1.6l8.5-2.6V18l-2.4 1.8v1.4l3.9-1 3.9 1v-1.4L13.5 18v-4.1l8.5 2.6Z"/></svg>
+          </div>
+        </div>
+        <div class="route-node">
+          <div class="flap-code" id="flap-dest" aria-label="{{ destination|upper }}"></div>
+          <div class="route-city">Destination</div>
+        </div>
+      </div>
+      <div class="route-summary">
+        <div class="summary-tile">
+          <span class="label">Flights found</span>
+          <span class="value">{{ flights|length }}</span>
+        </div>
+        <div class="summary-tile">
+          <span class="label">Saved route</span>
+          <span class="value">{% if favorites|selectattr('source', 'equalto', source)|selectattr('destination', 'equalto', destination)|list|length %}Yes{% else %}No{% endif %}</span>
+        </div>
+        <div class="summary-tile">
+          <span class="label">Destination weather</span>
+          <span class="value">{% if weather %}{{ weather.temp }}&deg; {{ weather.desc }}{% else %}Unavailable{% endif %}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICES -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Live prices
+        </div>
+        <button class="refresh-btn" id="refresh-btn" type="button" aria-label="Refresh prices" onclick="loadPrices()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>
+        </button>
+      </div>
+      <div class="price-updated" id="price-updated"></div>
+      <div id="price-box" aria-live="polite">
+        <div class="skeleton-grid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLIGHTS -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
+          Flights
+        </div>
+        {% if flights %}<span class="card-count" id="flight-count">{{ flights|length }} found</span>{% endif %}
+      </div>
+
+      {% if flights %}
+      <div class="board-tools">
+        <input class="board-search" id="flight-search" type="search" placeholder="Filter by airline, flight, or airport" aria-label="Filter flights">
+        <select class="board-filter" id="status-filter" aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="landed">Landed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="diverted">Diverted</option>
+          <option value="incident">Incident</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="board-no-results" id="board-no-results">No flights match those filters.</div>
+
+      {% for f in flights %}
+      {% set dep = f.get('departure', {}) %}
+      {% set arr = f.get('arrival', {}) %}
+      {% set flight_info = f.get('flight', {}) %}
+      {% set airline = f.get('airline', {}) %}
+      {% set status = f.get('flight_status', '') %}
+      {% set dep_time = dep.get('scheduled') or dep.get('estimated') or dep.get('actual') %}
+      {% set arr_time = arr.get('scheduled') or arr.get('estimated') or arr.get('actual') %}
+      {% set dep_delay = dep.get('delay') %}
+      {% set arr_delay = arr.get('delay') %}
+      {% set s = (status or '')|lower %}
+      {% if 'cancel' in s %}
+        {% set status_class, status_label = 'status-cancelled', status %}
+      {% elif 'divert' in s %}
+        {% set status_class, status_label = 'status-diverted', status %}
+      {% elif 'land' in s %}
+        {% set status_class, status_label = 'status-landed', status %}
+      {% elif 'active' in s or 'air' in s %}
+        {% set status_class, status_label = 'status-active', status %}
+      {% elif 'incident' in s %}
+        {% set status_class, status_label = 'status-incident', status %}
+      {% elif 'schedul' in s %}
+        {% set status_class, status_label = 'status-scheduled', status %}
+      {% else %}
+        {% set status_class, status_label = 'status-unknown', (status or 'Unknown') %}
+      {% endif %}
+
+      <div class="board-row" data-status="{{ status_class|replace('status-', '') }}" data-search="{{ dep.get('iata','') }} {{ dep.get('airport','') }} {{ arr.get('iata','') }} {{ arr.get('airport','') }} {{ flight_info.get('iata','') }} {{ airline.get('name','') }} {{ status }}">
+
+        <div class="board-origin">
+          <div class="board-code">{% if dep.get('iata') %}{{ dep.get('iata') }}{% else %}&mdash;{% endif %}</div>
+          <div class="board-airport">{{ dep.get('airport','') }}</div>
+          {% if dep_time %}<div class="board-time" data-time="{{ dep_time }}">Dep {{ dep_time }}</div>{% endif %}
+        </div>
+
+        <div class="board-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </div>
+
+        <div class="board-dest">
+          <div class="board-code">{% if arr.get('iata') %}{{ arr.get('iata') }}{% else %}&mdash;{% endif %}</div>
+          <div class="board-airport">{{ arr.get('airport','') }}</div>
+          {% if arr_time %}<div class="board-time" data-time="{{ arr_time }}">Arr {{ arr_time }}</div>{% endif %}
+        </div>
+
+        <div class="board-info">
+          <div>
+            <div class="board-flightno">{% if flight_info.get('iata') %}{{ flight_info.get('iata') }}{% else %}&mdash;{% endif %}</div>
+            {% if airline.get('name') %}<div class="board-airline">{{ airline.get('name') }}</div>{% endif %}
+          </div>
+          {% if dep_delay or arr_delay %}
+            <div class="board-delay">Delay {{ dep_delay or arr_delay }} min</div>
+          {% endif %}
+          <span class="status-pill {{ status_class }}">{{ status_label|title }}</span>
+        </div>
+
+        <button class="save-btn" type="button"
+          aria-label="Save flight {{ flight_info.get('iata','') }} as favorite" aria-pressed="false"
+          data-flight-no="{{ flight_info.get('iata','') }}"
+          data-airline="{{ airline.get('name','') }}"
+          data-source="{{ dep.get('iata','') }}"
+          data-destination="{{ arr.get('iata','') }}"
+          {% if not flight_info.get('iata') %}disabled title="No flight number available for this flight"{% endif %}
+          onclick="toggleFav(this)">
+          <svg viewBox="0 0 24 24"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        </button>
+
+      </div>
+      {% else %}
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <p><strong>No flights found</strong> Try double-checking the airport codes, or search again in a little while.</p>
+        </div>
+      {% endfor %}
+
+    </div>
+
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.5v-1.6L13.5 9V4a1.5 1.5 0 0 0-3 0v5L2 14.9v1.6l8.5-2.6V18l-2.4 1.8v1.4l3.9-1 3.9 1v-1.4L13.5 18v-4.1l8.5 2.6Z"/></svg>
+          <p><strong>Ready when you are</strong>Enter two airport codes to see live flights, prices, and weather for that route.</p>
+        </div>
+      </div>
+    {% endif %}
+
+  </main>
+</div>
+
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<script>
+// Safely embed server values as real JS values (not raw string interpolation)
+const src = {{ source | tojson }};
+const dst = {{ destination | tojson }};
+let favorites = {{ favorites | tojson }};
+
+const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+function isFavorited(flightNo) {
+  return favorites.some(f => f.flight_no === flightNo);
+}
+
+function renderFavoritesCard() {
+  const list = document.getElementById('favorites-list');
+  const count = document.getElementById('favorites-count');
+  if (!list) return;
+
+  if (count) count.textContent = favorites.length ? String(favorites.length) : '';
+
+  if (!favorites.length) {
+    list.innerHTML = '<div class="empty-line" id="favorites-empty">Star a flight to save it here.</div>';
+    return;
+  }
+
+  list.innerHTML = favorites.map(f => `
+    <div class="route-row" data-flight-no="${escapeHtml(f.flight_no)}">
+      <a class="route-link favorite-route-link" href="/?source=${encodeURIComponent(f.source)}&destination=${encodeURIComponent(f.destination)}">
+        <span class="route-codes-stack">
+          <span class="route-flightno">${escapeHtml(f.flight_no)}${f.airline ? ` &middot; ${escapeHtml(f.airline)}` : ''}</span>
+          <span class="route-codes">
+            ${escapeHtml(f.source)}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            ${escapeHtml(f.destination)}
+          </span>
+        </span>
+      </a>
+      <button class="icon-btn" title="Remove favorite" aria-label="Remove favorite"
+        data-fav-flightno="${escapeHtml(f.flight_no ?? '')}"
+        data-fav-source="${escapeHtml(f.source)}"
+        data-fav-dest="${escapeHtml(f.destination)}"
+        onclick="removeFavorite(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = value ?? '';
+  return div.innerHTML;
+}
+
+function showToast(message, variant) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${variant || 'info'}`;
+  el.textContent = message;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 2600);
+}
+
+/* ---- Live clock ---- */
+function tickClock() {
+  const el = document.getElementById('clock');
+  if (!el) return;
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+/* ---- Uppercase + letters-only inputs ---- */
+['source-input', 'destination-input'].forEach(id => {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    input.value = input.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  });
+});
+
+/* ---- Swap button ---- */
+const swapBtn = document.getElementById('swap-btn');
+if (swapBtn) {
+  swapBtn.addEventListener('click', () => {
+    const a = document.getElementById('source-input');
+    const b = document.getElementById('destination-input');
+
+    // Only swap & search if both fields have valid 3-letter codes
+    const aVal = a.value.trim().toUpperCase();
+    const bVal = b.value.trim().toUpperCase();
+
+    if (!aVal || !bVal) {
+      // Just swap values visually if fields are incomplete
+      [a.value, b.value] = [b.value, a.value];
+      a.focus();
+      return;
+    }
+
+    if (!/^[A-Z]{3}$/.test(aVal) || !/^[A-Z]{3}$/.test(bVal)) {
+      showToast('Enter valid 3-letter IATA codes before swapping', 'error');
+      return;
+    }
+
+    // Animate the button icon
+    const icon = swapBtn.querySelector('svg');
+    if (icon) {
+      icon.style.transition = 'transform 0.35s cubic-bezier(.16,1,.3,1)';
+      icon.style.transform = 'rotate(180deg)';
+      setTimeout(() => { icon.style.transform = ''; }, 400);
+    }
+
+    // Swap values
+    a.value = bVal;
+    b.value = aVal;
+
+    // Auto-submit so results update immediately
+    const form = document.getElementById('search-form');
+    if (form) form.submit();
+  });
+}
+
+/* ---- Form validation ---- */
+const searchForm = document.getElementById('search-form');
+if (searchForm) {
+  searchForm.addEventListener('submit', (e) => {
+    const a = document.getElementById('source-input');
+    const b = document.getElementById('destination-input');
+    const hint = document.getElementById('form-hint');
+    const valid = /^[A-Z]{3}$/.test(a.value) && /^[A-Z]{3}$/.test(b.value);
+    if (!valid) {
+      e.preventDefault();
+      hint.textContent = 'Enter valid 3-letter IATA codes for both airports';
+      hint.classList.add('error');
+      (a.value.length !== 3 ? a : b).focus();
+    }
+  });
+}
+
+/* ---- Split-flap departure board animation ---- */
+function buildFlapBoard(container, finalCode) {
+  if (!container) return;
+  const letters = (finalCode || '---').padEnd(3, '-').slice(0, 3).split('');
+  container.innerHTML = '';
+  const cells = letters.map(() => {
+    const flap = document.createElement('div');
+    flap.className = 'flap';
+    flap.innerHTML = '<span></span>';
+    container.appendChild(flap);
+    return flap.querySelector('span');
+  });
+  cells.forEach((cell, i) => animateFlap(cell, letters[i], i * 90));
+}
+
+function animateFlap(cell, target, delay) {
+  const targetChar = /[A-Z]/.test(target) ? target : '—';
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReduced) { cell.textContent = targetChar; return; }
+
+  const targetIndex = ALPHABET.indexOf(targetChar === '—' ? '#' : targetChar);
+  const steps = 10;
+  let i = 0;
+  setTimeout(() => {
+    const spin = setInterval(() => {
+      const idx = (targetIndex - (steps - i) + ALPHABET.length * 2) % ALPHABET.length;
+      cell.textContent = ALPHABET[idx] === '#' ? '—' : ALPHABET[idx];
+      i++;
+      if (i > steps) { clearInterval(spin); cell.textContent = targetChar; }
+    }, 45);
+  }, delay);
+}
+
+/* ---- Prices ---- */
+async function loadPrices() {
+  if (!dst) return;
+
+  const box = document.getElementById('price-box');
+  const updated = document.getElementById('price-updated');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  box.innerHTML = `
+    <div class="skeleton-grid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>`;
+  if (refreshBtn) { refreshBtn.classList.add('spinning'); refreshBtn.disabled = true; }
+
+  try {
+    const res = await fetch(`/prices?source=${encodeURIComponent(src)}&destination=${encodeURIComponent(dst)}`);
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
+    const data = await res.json();
+
+    if (!data.length) {
+      box.innerHTML = '<div class="price-message">No prices found for this route right now.</div>';
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    const grid = document.createElement('div');
+    grid.className = 'price-grid';
+
+    data.forEach(p => {
+      const initial = escapeHtml((p.airline || '?').charAt(0).toUpperCase());
+      const usd = Number(p.price_usd).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+      const pkr = Number(p.price_pkr).toLocaleString();
+      const stops = Number(p.stops || 0);
+      const item = document.createElement('div');
+      item.className = `price-item ${p.badge ? 'cheapest' : ''}`;
+      item.innerHTML = `
+        ${p.badge ? `<div class="price-badge">${escapeHtml(p.badge)}</div>` : ''}
+        <div class="price-airline-row">
+          <div class="airline-avatar">${initial}</div>
+          <div class="price-airline">${escapeHtml(p.airline)}</div>
+        </div>
+        <div class="price-flightno">${escapeHtml(p.flight_no)}</div>
+        <div class="price-value"><span class="cur">USD</span>${usd}</div>
+        <div class="price-pkr">PKR ${pkr}</div>
+        <div class="price-meta">
+          ${p.duration ? `<span class="price-chip">${escapeHtml(p.duration.replace('PT', '').toLowerCase())}</span>` : ''}
+          <span class="price-chip">${stops === 0 ? 'Nonstop' : `${stops} stop${stops > 1 ? 's' : ''}`}</span>
+        </div>
+      `;
+      grid.appendChild(item);
+    });
+
+    frag.appendChild(grid);
+    box.replaceChildren(frag);
+    if (updated) updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`;
+  } catch (err) {
+    console.error('Failed to load prices', err);
+    box.innerHTML = '<div class="price-message">Could not load prices. Please try again.</div>';
+    showToast('Could not refresh prices', 'error');
+  } finally {
+    if (refreshBtn) { refreshBtn.classList.remove('spinning'); refreshBtn.disabled = false; }
+  }
+}
+
+/* ---- Favorites ---- */
+function syncSaveButtons(flightNo, active) {
+  document.querySelectorAll(`.save-btn[data-flight-no="${CSS.escape(flightNo)}"]`).forEach(btn => {
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
+async function toggleFav(btn) {
+  const flightNo = btn.dataset.flightNo;
+  if (!flightNo) {
+    showToast('This flight has no flight number to save', 'error');
+    return;
+  }
+  const airline = btn.dataset.airline || '';
+  const s = btn.dataset.source || '';
+  const d = btn.dataset.destination || '';
+  const alreadyActive = btn.classList.contains('active');
+  const endpoint = alreadyActive ? '/favorite/remove' : '/favorite/add';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flight_no: flightNo, airline, source: s, destination: d })
+    });
+
+    if (res.ok) {
+      favorites = favorites.filter(f => f.flight_no !== flightNo);
+      if (!alreadyActive) favorites.push({ flight_no: flightNo, airline, source: s, destination: d });
+      syncSaveButtons(flightNo, !alreadyActive);
+      renderFavoritesCard();
+      showToast(alreadyActive ? 'Removed from favorites' : 'Added to favorites', 'success');
+    } else {
+      showToast("Couldn't update favorites", 'error');
+    }
+  } catch (err) {
+    console.error('Failed to update favorite', err);
+    showToast("Couldn't update favorites", 'error');
+  }
+}
+
+async function removeFavorite(btn) {
+  const flightNo = btn.dataset.favFlightno || null;
+  const source = btn.dataset.favSource || '';
+  const destination = btn.dataset.favDest || '';
+  try {
+    const res = await fetch('/favorite/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flight_no: flightNo, source, destination })
+    });
+    if (res.ok) {
+      favorites = favorites.filter(f =>
+        flightNo ? f.flight_no !== flightNo : !(f.source === source && f.destination === destination)
+      );
+      renderFavoritesCard();
+      if (flightNo) syncSaveButtons(flightNo, false);
+      showToast('Removed from favorites', 'success');
+    } else {
+      showToast("Couldn't remove favorite", 'error');
+    }
+  } catch (err) {
+    console.error('Failed to remove favorite', err);
+    showToast("Couldn't remove favorite", 'error');
+  }
+}
+
+async function clearHistory() {
+  try {
+    const res = await fetch('/history/clear', { method: 'POST' });
+    if (res.ok) {
+      location.reload();
+    } else {
+      showToast("Couldn't clear history", 'error');
+    }
+  } catch (err) {
+    console.error('Failed to clear history', err);
+    showToast("Couldn't clear history", 'error');
+  }
+}
+
+function formatFlightTimes() {
+  document.querySelectorAll('.board-time').forEach(el => {
+    const raw = el.dataset.time;
+    if (!raw) return;
+    const prefix = el.textContent.trim().startsWith('Arr') ? 'Arr' : 'Dep';
+    const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return;
+    el.textContent = `${prefix} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  });
+}
+
+function setupFlightFilters() {
+  const search = document.getElementById('flight-search');
+  const status = document.getElementById('status-filter');
+  const count = document.getElementById('flight-count');
+  const empty = document.getElementById('board-no-results');
+  const rows = Array.from(document.querySelectorAll('.board-row'));
+  if (!rows.length) return;
+
+  const applyFilters = () => {
+    const q = (search?.value || '').trim().toLowerCase();
+    const selected = status?.value || 'all';
+    let shown = 0;
+
+    rows.forEach(row => {
+      const matchesStatus = selected === 'all' || row.dataset.status === selected;
+      const matchesQuery = !q || (row.dataset.search || '').toLowerCase().includes(q);
+      const visible = matchesStatus && matchesQuery;
+      row.style.display = visible ? '' : 'none';
+      if (visible) shown += 1;
+    });
+
+    if (count) count.textContent = `${shown} of ${rows.length} shown`;
+    if (empty) empty.style.display = shown ? 'none' : 'block';
+  };
+
+  search?.addEventListener('input', applyFilters);
+  status?.addEventListener('change', applyFilters);
+}
+
+window.onload = () => {
+  buildFlapBoard(document.getElementById('flap-source'), src);
+  buildFlapBoard(document.getElementById('flap-dest'), dst);
+  formatFlightTimes();
+  setupFlightFilters();
+  loadPrices();
+  renderFavoritesCard();
+  document.querySelectorAll('.save-btn').forEach(btn => {
+    const flightNo = btn.dataset.flightNo;
+    if (flightNo && isFavorited(flightNo)) {
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+    }
+  });
+};
+</script>
+
+</body>
+</html>
